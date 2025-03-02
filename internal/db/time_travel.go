@@ -21,6 +21,12 @@ func (s *Store) GetAt(key string, at time.Time) (string, bool) {
 			case EventDel:
 				value = ""
 				exists = false
+			case EventUpd:
+				value = event.NewValue
+				exists = true
+			case EventGet:
+				value = event.OldValue
+				exists = true
 			}
 		}
 	}

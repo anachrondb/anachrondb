@@ -7,6 +7,9 @@ type EventType string
 const (
 	EventSet EventType = "SET"
 	EventDel EventType = "DEL"
+	EventUpd EventType = "UPD"
+	EventGet EventType = "GET"
+	EventLst EventType = "LST"
 )
 
 type Event struct {
