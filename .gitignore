@@ -1,0 +1,16 @@
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Output folders
+/bin/
+/build/
+/dist/
+
+# Go
+/vendor/
+go.sum
