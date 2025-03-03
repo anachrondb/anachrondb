@@ -1,21 +1,21 @@
 package db
 
-import "time"
+import (
+	"time"
+)
 
 type EventType string
 
 const (
-	EventSet EventType = "SET"
-	EventDel EventType = "DEL"
-	EventUpd EventType = "UPD"
-	EventGet EventType = "GET"
-	EventLst EventType = "LST"
+    EventSet    EventType = "SET"
+    EventDelete EventType = "DELETE"
 )
 
 type Event struct {
-	Timestamp time.Time
-	Type      EventType
-	Key       string
-	OldValue  string
-	NewValue  string
+    Timestamp time.Time
+    Type      EventType
+    Key       string
+    OldValue  []byte
+    NewValue  []byte
+    Version   int64
 }

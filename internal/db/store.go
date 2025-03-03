@@ -34,8 +34,8 @@ func (s *Store) Set(key, value string) {
 		Timestamp: time.Now(),
 		Type: EventSet,
 		Key: key,
-		OldValue: oldValue,
-		NewValue: value,
+		OldValue: []byte(oldValue),
+		NewValue: []byte(value),
 	})
 }
 
