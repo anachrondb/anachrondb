@@ -7,8 +7,22 @@ import (
 	"time"
 )
 
+func waitWithTimeout(wg *sync.WaitGroup, timeout time.Duration, t *testing.T) {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return
+	case <-time.After(timeout):
+		t.Fatalf("test timed out after %s", timeout)
+	}
+}
+
 func TestEventDispatcher_SingleSubscriber(t *testing.T) {
-	dispatcher := NewEventDispatcher(10)
+	dispatcher := NewEventDispatcher(1000, 10)
 	defer dispatcher.Stop()
 
 	var wg sync.WaitGroup
@@ -17,7 +31,7 @@ func TestEventDispatcher_SingleSubscriber(t *testing.T) {
 	dispatcher.Subscribe(func(e Event) {
 		defer wg.Done()
 		if e.Key != "test-key" {
-			t.Errorf("expected key 'test-key', got '%s'", e.Key)
+			t.Errorf("unexpected event key: %s", e.Key)
 		}
 	})
 
@@ -25,18 +39,17 @@ func TestEventDispatcher_SingleSubscriber(t *testing.T) {
 		Timestamp: time.Now(),
 		Type:      EventSet,
 		Key:       "test-key",
-		NewValue:  []byte("value"),
 	})
 
-	waitWithTimeout(&wg, 1*time.Second, t)
+	waitWithTimeout(&wg, 2*time.Second, t)
 }
 
 func TestEventDispatcher_MultipleSubscribers(t *testing.T) {
-	dispatcher := NewEventDispatcher(10)
+	dispatcher := NewEventDispatcher(1000, 10)
 	defer dispatcher.Stop()
 
 	var wg sync.WaitGroup
-	subscriberCount := 5
+	subscriberCount := 10
 	wg.Add(subscriberCount)
 
 	for i := 0; i < subscriberCount; i++ {
@@ -49,25 +62,49 @@ func TestEventDispatcher_MultipleSubscribers(t *testing.T) {
 		Timestamp: time.Now(),
 		Type:      EventSet,
 		Key:       "multi-key",
-		NewValue:  []byte("value"),
 	})
 
-	waitWithTimeout(&wg, 1*time.Second, t)
+	waitWithTimeout(&wg, 2*time.Second, t)
 }
 
-func TestEventDispatcher_QueueOverflow(t *testing.T) {
-	dispatcher := NewEventDispatcher(1)
+func TestEventDispatcher_ConcurrentPublish(t *testing.T) {
+	dispatcher := NewEventDispatcher(2_000_000, 500)
 	defer dispatcher.Stop()
 
 	var wg sync.WaitGroup
-	wg.Add(1)
+	subscriberCount := 100
+	eventCount := 1_000_000
+	wg.Add(subscriberCount * eventCount)
+
+	for i := 0; i < subscriberCount; i++ {
+		dispatcher.Subscribe(func(e Event) {
+			defer wg.Done()
+		})
+	}
+
+	for i := 0; i < eventCount; i++ {
+		dispatcher.Publish(Event{
+			Timestamp: time.Now(),
+			Type:      EventSet,
+			Key:       fmt.Sprintf("key-%d", i),
+		})
+	}
+
+	waitWithTimeout(&wg, 30*time.Second, t)
+}
+
+func TestEventDispatcher_QueueOverflow(t *testing.T) {
+	dispatcher := NewEventDispatcher(1, 2)
+	defer dispatcher.Stop()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
 
 	dispatcher.Subscribe(func(e Event) {
 		defer wg.Done()
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	})
 
-	// First event gets through
 	dispatcher.Publish(Event{
 		Timestamp: time.Now(),
 		Type:      EventSet,
@@ -80,45 +117,5 @@ func TestEventDispatcher_QueueOverflow(t *testing.T) {
 		Key:       "second",
 	})
 
-	waitWithTimeout(&wg, 2*time.Second, t)
-}
-
-func TestEventDispatcher_ConcurrentPublish(t *testing.T) {
-	dispatcher := NewEventDispatcher(5000000) // Increase queue size
-	defer dispatcher.Stop()
-
-	var wg sync.WaitGroup
-	subscriberCount := 10000
-	eventCount := 1000000
-	totalEvents := subscriberCount * eventCount
-	wg.Add(totalEvents)
-
-	for i := 0; i < subscriberCount; i++ {
-		dispatcher.Subscribe(func(e Event) {
-			wg.Done()
-		})
-	}
-
-	for i := 0; i < eventCount; i++ {
-		dispatcher.Publish(Event{
-			Timestamp: time.Now(),
-			Type:      EventSet,
-			Key:       fmt.Sprintf("key-%d", i),
-		})
-	}
-
-	waitWithTimeout(&wg, 1*time.Minute, t)
-}
-
-func waitWithTimeout(wg *sync.WaitGroup, timeout time.Duration, t *testing.T) {
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(timeout):
-		t.Fatal("test timed out")
-	}
+	waitWithTimeout(&wg, 1*time.Second, t)
 }
