@@ -102,7 +102,7 @@ func TestEventDispatcher_QueueOverflow(t *testing.T) {
 
 	dispatcher.Subscribe(func(e Event) {
 		defer wg.Done()
-		time.Sleep(100 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond) 
 	})
 
 	dispatcher.Publish(Event{
